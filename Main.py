@@ -42,9 +42,9 @@ class Worker(QThread):
         message = f'进程已终止...'
         self.sinOut.emit(message)
         
-  def getdata(self, year, till, user, pwd, rec, chk_dld, once, timer, chk_workday):
-    self.year = year
-    self.till = till
+  def getdata(self, ordfrom, ordtill, user, pwd, rec, chk_dld, once, timer, chk_workday):
+    self.ordfrom = ordfrom
+    self.ordtill = ordtill
     self.user = user
     self.pwd = pwd
     self.rec = rec
@@ -52,6 +52,7 @@ class Worker(QThread):
     self.once = once
     self.timer = timer
     self.chk_workday = chk_workday
+    self.supplier = self.to_unicode(self.user[0:5])
   
   def send_mail(self):
     mail_host = 'smtp.163.com'
@@ -101,19 +102,37 @@ class Worker(QThread):
         message = f'{e}'
         self.sinOut.emit(message)
 
-  def to_unicode(self, supplier):
+  def to_unicode(self, text):
     ret = ''
-    for v in supplier:
-        ret = ret + hex(ord(v)).upper().replace('0X', '\\\\u')
-
+    for v in text:
+        ret = ret + hex(ord(v)).lower().replace('0x', '\\\\u')
     return ret
-
-  def post_download(self):
-        supplier = self.to_unicode(self.user[0:5])
-        self.ym = self.year+self.till
+  
+  def first_download(self,filename): #filename不含后缀.zip
+        ufilename = self.to_unicode(filename[:-5])
         url = 'http://192.168.10.33/WCFService/WcfService.svc'
         headers = {'content-type': "text/xml", 'Referer': 'http://192.168.10.33/ClientBin/SilverlightUI.xap', 'SOAPAction': '"SysManager/WcfService/IPO0710GetInfo"'}
-        scope = f'<parm>{"SupplierNum":"{supplier}","Series":"-1","Check":"{self.chk_dld}"}</parm>'
+        prms = f'<prms>{{"OrderNo":"{ufilename}"}}</prms>'        
+        body = '<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">' \
+                    '<s:Body>' \
+                    '<UpeFirstDownLoadTimeIPO0710 xmlns="SysManager">' \
+                    '<baseInfo xmlns:d4p1="http://schemas.datacontract.org/2004/07/Silverlight.BaseDTO.Entities" xmlns:i="http://www.w3.org/2001/XMLSchema-instance">' \
+                    '</baseInfo>' \
+                    f'{prms}' \
+                    '</UpeFirstDownLoadTimeIPO0710>' \
+                    '</s:Body>' \
+                    '</s:Envelope>'      
+
+        self.resp= requests.post(url, data=body, headers=headers, timeout=5).decode('utf8')
+        print(self.resp)
+  
+  def post_download(self):
+        url = 'http://192.168.10.33/WCFService/WcfService.svc'
+        headers = {'content-type': "text/xml", 'Referer': 'http://192.168.10.33/ClientBin/SilverlightUI.xap', 'SOAPAction': '"SysManager/WcfService/IPO0710GetInfo"'}
+        if self.chk_dld == '1' or self.once == '1':  #考虑已下载且手动执行，才考虑日期范围，否则只查询未下载的所有订单
+            scope = f'<parm>{{"SupplierNum":"{self.supplier}","Series":"-1","ActualOrderTimeS":"{self.ordfrom}","ActualOrderTimeE":"{self.ordtill}""Check":"{self.chk_dld}"}}</parm>'
+        else:
+            scope = f'<parm>{{"SupplierNum":"{self.supplier}","Series":"-1","Check":"{self.chk_dld}"}}</parm>'
             
         body = '<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">' \
                     '<s:Body>' \
@@ -129,7 +148,7 @@ class Worker(QThread):
                     '</s:Body>' \
                     '</s:Envelope>'       
 
-        self.response= requests.post(url, data=body, headers=headers)
+        self.response= requests.post(url, data=body, headers=headers, timeout=5)
         self.resp_str = str(self.response.content.decode('utf8'))
         xml = etree.fromstring(self.resp_str)
         for filenm in xml.iter('{*}FileNm'):
@@ -147,8 +166,10 @@ class Worker(QThread):
                     dld_zip = requests.get(url=dld_path,stream=True)
                     with open(self.filepath,"wb") as zip:
                         zip.write(dld_zip.content)
-                    message = f'下载完成! '
-                    self.sinOut.emit(message)           
+                    message = f'下载完成! 回传下载时间'
+                    self.sinOut.emit(message)
+                    self.first_download(filenm.text)
+
             
             except Exception as e:
                 message = f'{e}'
