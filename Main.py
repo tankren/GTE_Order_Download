@@ -168,7 +168,7 @@ class Worker(QThread):
                         zip.write(dld_zip.content)
                     message = f'下载完成! 回传下载时间'
                     self.sinOut.emit(message)
-                    self.first_download(filenm.text)
+                    self.first_download(filenm.text)  #下载完成就回传下载时间
 
             
             except Exception as e:
@@ -300,8 +300,6 @@ class Worker(QThread):
             message = f'{e}'  
             self.sinOut.emit(message)
 
-
-
 class MyWidget(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -333,14 +331,19 @@ class MyWidget(QWidget):
         self.cb_ordfrom.setCursor(Qt.PointingHandCursor)
         self.cb_ordfrom.setDisplayFormat('yyyy-MM-dd')
         self.cb_ordfrom.setCalendarPopup(True)
-        self.cb_ordfrom.editingFinished.connect(self.get_ordfrom_ordtill)
+        self.cb_ordfrom.calendarWidget().setGridVisible(True)
+        self.cb_ordfrom.calendarWidget().setVerticalHeaderFormat(QCalendarWidget.ISOWeekNumbers)
+        self.cb_ordfrom.dateChanged.connect(self.get_ordfrom_ordtill)
+        
 
         self.fld_ordtill = QLabel('结束日期:')
         self.cb_ordtill = QDateEdit(QDate.currentDate().addDays(7))
-        self.cb_ordtill.setCursor(Qt.PointingHandCursor)
-        self.cb_ordtill.setCalendarPopup(True)
+        self.cb_ordtill.setCursor(Qt.PointingHandCursor)        
         self.cb_ordtill.setDisplayFormat('yyyy-MM-dd')
-        self.cb_ordtill.editingFinished.connect(self.get_ordfrom_ordtill)
+        self.cb_ordtill.setCalendarPopup(True)
+        self.cb_ordtill.calendarWidget().setGridVisible(True)
+        self.cb_ordtill.calendarWidget().setVerticalHeaderFormat(QCalendarWidget.ISOWeekNumbers)
+        self.cb_ordtill.dateChanged.connect(self.get_ordfrom_ordtill)
 
         self.chk_dld = QCheckBox('包含已下载', self)
         self.chk_dld.setCursor(Qt.PointingHandCursor)
