@@ -508,8 +508,7 @@ class MyWidget(QWidget):
             )
 
     def set_schedule(self):
-        year = str(self.cb_ordtill.currentText())
-        till = str(self.cb_ordtill.currentText())
+        self.get_ordfrom_ordtill()
         user = str(self.line_user.text())
         pwd = str(self.line_pwd.text())
         rec = str(self.line_email.text())
@@ -539,7 +538,15 @@ class MyWidget(QWidget):
                     self.btn_schedule.setEnabled(False)
                     # 订单开始日期，订单结束日期，用户名，密码，收件人，包含已下载，计划执行=0，定时时间，仅工作日）
                     self.thread.getdata(
-                        year, till, user, pwd, rec, chk_dld, "0", timer, chk_workday
+                        self.ordfrom,
+                        self.ordtill,
+                        user,
+                        pwd,
+                        rec,
+                        chk_dld,
+                        "0",
+                        timer,
+                        chk_workday,
                     )
                     self.thread.start()
             else:
