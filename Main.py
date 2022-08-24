@@ -82,7 +82,11 @@ class Worker(QThread):
             part.add_header("Content-Disposition", "attachment", filename=file)
             email.attach(part)
         # dynamic email content
-        if not file_list:
+        if not file_list and self.once == "1":
+            message = f"单次执行无订单不发送邮件!"
+            self.sinOut.emit(message)
+            return
+        elif not file_list:
             email_content = f"Dear all,\n\tGTE {QDate.currentDate().toString('yyyy-MM-dd')} 没有新的订单, 请知悉! \n\nVHCN ICO"
         else:
             email_content = f"Dear all,\n\t附件为GTE {QDate.currentDate().toString('yyyy-MM-dd')} 订单, 请查收! \n\nVHCN ICO"
@@ -111,7 +115,6 @@ class Worker(QThread):
 
     def first_download(self, filename):  # filename不含后缀.zip
         ufilename = self.to_unicode(self.OrderNo)
-        print(ufilename)
         url = "http://192.168.10.33/WCFService/WcfService.svc"
         headers = {
             "content-type": "text/xml",
@@ -134,7 +137,6 @@ class Worker(QThread):
         self.resp = requests.post(
             url, data=body, headers=headers, timeout=5
         ).content.decode("utf8")
-        print(self.resp)
 
     def post_download(self):
         url = "http://192.168.10.33/WCFService/WcfService.svc"
@@ -163,10 +165,8 @@ class Worker(QThread):
             "</s:Body>"
             "</s:Envelope>"
         )
-        print(body)
         self.response = requests.post(url, data=body, headers=headers, timeout=5)
         self.resp_str = str(self.response.content.decode("utf8"))
-        print(self.resp_str)
         xml = etree.fromstring(self.resp_str)
         for filenm in xml.iter("{*}FileNm"):
             try:
@@ -176,7 +176,6 @@ class Worker(QThread):
                     self.OrderNo = ancestor.find("./{*}OrderNo").text
                 dld_path = f"http://192.168.10.33/GTESGFile/Instruct/3334-A/{filenm.text[7:15]}/{filenm.text}"
                 # e.g.: http://192.168.10.33/GTESGFile/Instruct/3334-A/20220908/M23334A2022090805ZL.zip
-                print(dld_path)
                 message = f"开始下载Zip文件 {filenm.text}"
                 self.sinOut.emit(message)
                 self.filepath = f"{self.folder}\\{filenm.text}"
