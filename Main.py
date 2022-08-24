@@ -22,6 +22,7 @@ from email.utils import formataddr
 import re
 import os
 from lxml import etree
+import tempfile
 from apscheduler.schedulers.background import BackgroundScheduler
 
 
@@ -30,7 +31,7 @@ class Worker(QThread):
 
     def __init__(self, parent=None):
         super(Worker, self).__init__(parent)
-        self.folder = "C:\\temp\\GTE\\Order"
+        self.folder = f"{tempfile.gettempdir()}\GET\Order"
         if os.path.exists(self.folder):
             for zip in os.listdir(self.folder):
                 os.remove(f"{self.folder}\\{zip}")
@@ -168,6 +169,8 @@ class Worker(QThread):
         self.response = requests.post(url, data=body, headers=headers, timeout=5)
         self.resp_str = str(self.response.content.decode("utf8"))
         xml = etree.fromstring(self.resp_str)
+        message = f"临时下载目录为: {self.folder}"
+        self.sinOut.emit(message)
         for filenm in xml.iter("{*}FileNm"):
             try:
                 message = f"命中: {filenm.text}"
