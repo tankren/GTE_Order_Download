@@ -396,7 +396,9 @@ class MyWidget(QWidget):
         self.line_email = QLineEdit()
         self.line_email.setClearButtonEnabled(True)
         self.line_email.setPlaceholderText("多个收件人之间用分号;分开")
-        self.line_email.setText("chenlong.ren@cn.bosch.com;feng.he@cn.bosch.com")  # 测试
+        self.line_email.setText(
+            "chenlong.ren@cn.bosch.com;feng.he@cn.bosch.com;wenzhuo.gu@cn.bosch.com"
+        )  # 测试
         self.line_email.setToolTip(self.line_email.text())
         self.line_email.editingFinished.connect(self.check_email)
 
