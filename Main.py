@@ -140,7 +140,7 @@ class Worker(QThread):
   </table>
 </body>
 </html>
-"""                
+"""
         else:
             pass
             email_content = """ \
