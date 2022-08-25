@@ -33,8 +33,7 @@ class Worker(QThread):
         super(Worker, self).__init__(parent)
         self.folder = f"{tempfile.gettempdir()}\GET\Order"
         if os.path.exists(self.folder):
-            for zip in os.listdir(self.folder):
-                os.remove(f"{self.folder}\\{zip}")
+            self.purge_file()
         else:
             os.makedirs(self.folder)
 
@@ -42,6 +41,10 @@ class Worker(QThread):
         self.terminate()
         message = f"进程已终止..."
         self.sinOut.emit(message)
+
+    def purge_file(self):
+        for zip in os.listdir(self.folder):
+            os.remove(f"{self.folder}\\{zip}")
 
     def getdata(
         self, ordfrom, ordtill, user, pwd, rec, chk_dld, once, timer, chk_workday
@@ -316,6 +319,7 @@ class Worker(QThread):
             message = f"获取结束, 发送邮件..."
             self.sinOut.emit(message)
             self.send_mail()
+            self.purge_file()
             if self.once == "0":
                 message = f"{datetime.now()} - 定时任务已完成! "
                 self.sinOut.emit(message)
@@ -390,7 +394,11 @@ class Worker(QThread):
                     datetime.strptime(self.sch_dhm, "%Y-%m-%d %H:%M")
                     - datetime.strptime(now_dhm, "%Y-%m-%d %H:%M")
                 )
-                self.gap_h = gap.split(":")[0]
+                if "day" in str(gap):
+                    self.gap_d = gap[0]
+                    self.gap_h = int(gap.split(":")[0][-2:]) + 24 * int(self.gap_d)
+                else:
+                    self.gap_h = gap.split(":")[0]
                 self.gap_m = gap.split(":")[1]
 
     def run(self):
@@ -502,7 +510,7 @@ class MyWidget(QWidget):
         self.line_email.setClearButtonEnabled(True)
         self.line_email.setPlaceholderText("多个收件人之间用分号;分开")
         self.line_email.setText(
-            "chenlong.ren@cn.bosch.com;feng.he@cn.bosch.com;wenzhuo.gu@cn.bosch.com"
+            "chenlong.ren@cn.bosch.com;feng.he@cn.bosch.com;wenzhuo.gu@cn.bosch.com;external.Kang.Zhao2@cn.bosch.com;external.Changliu.Zhao@cn.bosch.com;external.zhumin.zhao@cn.bosch.com"
         )  # 测试
         self.line_email.setToolTip(self.line_email.text())
         self.line_email.editingFinished.connect(self.check_email)
