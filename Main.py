@@ -442,7 +442,7 @@ class MyWidget(QWidget):
         self.thread = Worker()
         self.title = f"GTE订单查询下载工具 v0.1   - Made by REC3WX"
         self.setWindowTitle(self.title)
-        pixmapi = QStyle.SP_FileDialogDetailedView
+        pixmapi = QStyle.SP_DialogOpenButton
         icon = self.style().standardIcon(pixmapi)
         self.setWindowIcon(icon)
         self.setFixedSize(700, 300)
