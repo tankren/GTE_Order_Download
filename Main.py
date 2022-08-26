@@ -12,18 +12,20 @@ from datetime import datetime, timedelta
 from PySide6.QtWidgets import *
 from PySide6.QtGui import QFont
 from PySide6.QtCore import Slot, Qt, QThread, Signal, QEvent, QDate
-import sys
-import requests
-import smtplib
+from apscheduler.schedulers.background import BackgroundScheduler
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.mime.application import MIMEApplication
 from email.utils import formataddr
+from zipfile import ZipFile
+from pathlib import Path
+from lxml import etree
 import re
 import os
-from lxml import etree
 import tempfile
-from apscheduler.schedulers.background import BackgroundScheduler
+import sys
+import requests
+import smtplib
 
 
 class Worker(QThread):
@@ -45,6 +47,47 @@ class Worker(QThread):
     def purge_file(self):
         for zip in os.listdir(self.folder):
             os.remove(f"{self.folder}\\{zip}")
+
+    def decode(self, str):
+        # 编码转换
+        try:
+            string = str.encode("cp437").decode("gbk")
+        except:
+            string = str.encode("utf-8").decode("utf-8")
+        return string
+
+    def rezip(self, filepath, temp_dir):
+        # 创建重命名列表
+        file_list = []
+        # 解压
+        with ZipFile(filepath, allowZip64=True) as unzip:
+            for path in unzip.namelist():
+                path = unzip.extract(path, temp_dir)
+                file_list.append(path)
+
+        for file in file_list:
+            new_file_path = self.decode(file)
+            old_file_path = os.path.join(
+                os.path.dirname(new_file_path), os.path.basename(file)
+            )
+            if old_file_path != new_file_path:
+                Path(old_file_path).rename(new_file_path)
+        # 删除老的zip
+        os.remove(filepath)
+        # 创建新的zip
+        newzip = ZipFile(filepath, "w")
+        # 写入文件
+        for i in os.walk(temp_dir):
+            for n in i[2]:
+                newzip.write("".join((i[0], "\\", n)), n)
+        zips = os.listdir(temp_dir)
+        # 删除临时目录下的文件
+        os.chdir(temp_dir)
+        for zip in zips:
+            os.remove(zip)
+        os.chdir("..")
+        # 删除临时文件夹
+        os.removedirs(temp_dir)
 
     def getdata(
         self, ordfrom, ordtill, user, pwd, rec, chk_dld, once, timer, chk_workday
@@ -293,6 +336,9 @@ class Worker(QThread):
                 dld_zip = requests.get(url=dld_path, stream=True)
                 with open(self.filepath, "wb") as zip:
                     zip.write(dld_zip.content)
+                # 转换乱码文件名并重新打包
+                temp_dir = self.filepath[:-4]
+                self.rezip(self.filepath, temp_dir)
                 message = f"下载完成! 回传下载时间"
                 self.sinOut.emit(message)
                 self.first_download(filenm.text)  # 下载完成就回传下载时间
