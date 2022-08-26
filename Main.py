@@ -265,7 +265,7 @@ class Worker(QThread):
             ret = ret + hex(ord(v)).lower().replace("0x", "\\\\u")
         return ret
 
-    def first_download(self, filename):  # filename不含后缀.zip
+    def first_download(self):  # filename不含后缀.zip
         ufilename = self.to_unicode(self.OrderNo)
         url = "http://192.168.10.33/WCFService/WcfService.svc"
         headers = {
@@ -341,7 +341,7 @@ class Worker(QThread):
                 self.rezip(self.filepath, temp_dir)
                 message = f"下载完成! 回传下载时间"
                 self.sinOut.emit(message)
-                self.first_download(filenm.text)  # 下载完成就回传下载时间
+                self.first_download()  # 下载完成就回传下载时间
 
             except Exception as e:
                 message = f"{e}"
