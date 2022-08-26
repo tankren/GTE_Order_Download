@@ -499,7 +499,7 @@ class MyWidget(QWidget):
         pixmapi = QStyle.SP_DialogOpenButton
         icon = self.style().standardIcon(pixmapi)
         self.setWindowIcon(icon)
-        self.setFixedSize(700, 300)
+        self.setFixedSize(800, 350)
 
         self.tray = QSystemTrayIcon()
         self.tray.setIcon(icon)
