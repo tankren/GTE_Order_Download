@@ -95,6 +95,7 @@ class Worker(QThread):
         self.ordfrom = ordfrom
         self.ordtill = ordtill
         self.user = user
+        self.user2 = f"{user[0:4]}-A"
         self.pwd = pwd
         self.rec = rec
         self.chk_dld = chk_dld
@@ -322,13 +323,14 @@ class Worker(QThread):
         xml = etree.fromstring(self.resp_str)
         message = f"临时下载目录为: {self.folder}"
         self.sinOut.emit(message)
+
         for filenm in xml.iter("{*}FileNm"):
             try:
                 message = f"命中: {filenm.text}"
                 self.sinOut.emit(message)
                 for ancestor in filenm.iterancestors("{*}IPO0710DTO"):
                     self.OrderNo = ancestor.find("./{*}OrderNo").text
-                dld_path = f"http://192.168.10.33/GTESGFile/Instruct/3334-A/{filenm.text[7:15]}/{filenm.text}"
+                dld_path = f"http://192.168.10.33/GTESGFile/Instruct/{self.user2}/{filenm.text[7:15]}/{filenm.text}"
                 # e.g.: http://192.168.10.33/GTESGFile/Instruct/3334-A/20220908/M23334A2022090805ZL.zip
                 message = f"开始下载Zip文件 {filenm.text}"
                 self.sinOut.emit(message)
@@ -509,11 +511,11 @@ class MyWidget(QWidget):
         self.fld_user = QLabel("用户名:")
         self.line_user = QLineEdit()
         self.line_user.setClearButtonEnabled(True)
-        self.line_user.setText("3334A01")  # 测试
+        self.line_user.setText("1509A01")  # 测试
         self.fld_pwd = QLabel("密码:")
         self.line_pwd = QLineEdit()
         self.line_pwd.setClearButtonEnabled(True)
-        self.line_pwd.setText("123456")  # 测试
+        self.line_pwd.setText("1509-A01")  # 测试
         self.line_pwd.setEchoMode(QLineEdit.PasswordEchoOnEdit)
 
         self.fld_ordfrom = QLabel("开始日期:")
@@ -556,7 +558,7 @@ class MyWidget(QWidget):
         self.line_email.setClearButtonEnabled(True)
         self.line_email.setPlaceholderText("多个收件人之间用分号;分开")
         self.line_email.setText(
-            "chenlong.ren@cn.bosch.com;feng.he@cn.bosch.com;wenzhuo.gu@cn.bosch.com;external.Kang.Zhao2@cn.bosch.com;external.Changliu.Zhao@cn.bosch.com;external.zhumin.zhao@cn.bosch.com"
+            "chenlong.ren@vhit-weifu.com;feng.he@vhit-weifu.com;wenzhuo.gu@vhit-weifu.com;wenjie.shen@vhit-weifu.com;CS01.VHCN@Fiege.com.cn"
         )  # 测试
         self.line_email.setToolTip(self.line_email.text())
         self.line_email.editingFinished.connect(self.check_email)
