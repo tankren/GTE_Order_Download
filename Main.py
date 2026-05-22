@@ -4,8 +4,6 @@ Created on Thu Aug  9 21:05:37 2022
 
 @author: REC3WX
 
-vK8FXz+w~UxHR2L
-
 """
 
 from datetime import datetime, timedelta
@@ -33,6 +31,7 @@ class Worker(QThread):
 
     def __init__(self, parent=None):
         super(Worker, self).__init__(parent)
+        self._stop_requested = False
         self.folder = f"{tempfile.gettempdir()}\GET\Order"
         if os.path.exists(self.folder):
             self.purge_file()
@@ -40,7 +39,11 @@ class Worker(QThread):
             os.makedirs(self.folder)
 
     def stop_self(self):
-        self.terminate()
+        self._stop_requested = True
+        try:
+            self.scheduler.shutdown()
+        except:
+            pass
         message = f"进程已终止..."
         self.sinOut.emit(message)
 
@@ -105,11 +108,10 @@ class Worker(QThread):
         self.supplier = self.to_unicode(self.user[0:5])
 
     def send_mail(self):
-        mail_host = "smtp.163.com"
-        mail_user = "vhcn_lop@163.com"
-        mail_pass = "YQXQMPJDDTSOJLOC"
-        # 邮件发送方邮箱地址
-        sender = "vhcn_lop@163.com"
+        mail_host = os.environ.get("MAIL_HOST", "smtp.163.com")
+        mail_user = os.environ.get("MAIL_USER", "")
+        mail_pass = os.environ.get("MAIL_PASS", "")
+        sender = mail_user
         # 邮件接受方邮箱地址，注意需要[]包裹，这意味着你可以写多个邮件地址群发
         receivers = self.rec
         # 设置email信息
@@ -126,7 +128,8 @@ class Worker(QThread):
         # add attachments
         file_list = [f for f in os.listdir(self.folder) if f.endswith(".zip")]
         for file in file_list:
-            part = MIMEApplication(open(f"{self.folder}\\{file}", "rb").read())
+            with open(f"{self.folder}\\{file}", "rb") as f:
+                part = MIMEApplication(f.read())
             part.add_header("Content-Disposition", "attachment", filename=file)
             email.attach(part)
         # dynamic email content
@@ -324,7 +327,11 @@ class Worker(QThread):
         message = f"临时下载目录为: {self.folder}"
         self.sinOut.emit(message)
 
+        found = False
         for filenm in xml.iter("{*}FileNm"):
+            if self._stop_requested:
+                break
+            found = True
             try:
                 message = f"命中: {filenm.text}"
                 self.sinOut.emit(message)
@@ -336,8 +343,8 @@ class Worker(QThread):
                 self.sinOut.emit(message)
                 self.filepath = f"{self.folder}\\{filenm.text}"
                 dld_zip = requests.get(url=dld_path, stream=True)
-                with open(self.filepath, "wb") as zip:
-                    zip.write(dld_zip.content)
+                with open(self.filepath, "wb") as f:
+                    f.write(dld_zip.content)
                 # 转换乱码文件名并重新打包
                 temp_dir = self.filepath[:-4]
                 self.rezip(self.filepath, temp_dir)
@@ -348,7 +355,7 @@ class Worker(QThread):
             except Exception as e:
                 message = f"{e}"
                 self.sinOut.emit(message)
-        else:
+        if not found:
             message = f"没有找到新的订单..."
             self.sinOut.emit(message)
 
@@ -451,6 +458,8 @@ class Worker(QThread):
 
     def run(self):
         # 主逻辑
+        if self._stop_requested:
+            return
         if self.once == "1":
             try:
                 self.chain()
