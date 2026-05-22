@@ -48,8 +48,8 @@ class Worker(QThread):
         self.sinOut.emit(message)
 
     def purge_file(self):
-        for zip in os.listdir(self.folder):
-            os.remove(f"{self.folder}\\{zip}")
+        for fname in os.listdir(self.folder):
+            os.remove(os.path.join(self.folder, fname))
 
     def decode(self, str):
         # 编码转换
@@ -75,22 +75,14 @@ class Worker(QThread):
             )
             if old_file_path != new_file_path:
                 Path(old_file_path).rename(new_file_path)
-        # 删除老的zip
         os.remove(filepath)
-        # 创建新的zip
-        newzip = ZipFile(filepath, "w")
-        # 写入文件
-        for i in os.walk(temp_dir):
-            for n in i[2]:
-                newzip.write("".join((i[0], "\\", n)), n)
-        zips = os.listdir(temp_dir)
-        # 删除临时目录下的文件
-        os.chdir(temp_dir)
-        for zip in zips:
-            os.remove(zip)
-        os.chdir("..")
-        # 删除临时文件夹
-        os.removedirs(temp_dir)
+        with ZipFile(filepath, "w") as newzip:
+            for dirpath, _, filenames in os.walk(temp_dir):
+                for fname in filenames:
+                    newzip.write(os.path.join(dirpath, fname), fname)
+        for fname in os.listdir(temp_dir):
+            os.remove(os.path.join(temp_dir, fname))
+        os.rmdir(temp_dir)
 
     def getdata(
         self, ordfrom, ordtill, user, pwd, rec, chk_dld, once, timer, chk_workday
@@ -107,146 +99,83 @@ class Worker(QThread):
         self.chk_workday = chk_workday
         self.supplier = self.to_unicode(self.user[0:5])
 
+    @staticmethod
+    def _email_html(body_text):
+        return f"""\
+<html>
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+  <title>GTE订单自动下载结果</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+</head>
+<body style="margin: 0; padding: 0;">
+  <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
+    <tr>
+      <td style="padding: 20px 0 30px 0;">
+        <table align="center" border="0" cellpadding="0" cellspacing="0" width="600" style="border-collapse: collapse; border: 1px solid #cccccc;">
+          <tr>
+            <td align="center" bgcolor="#005691" style="padding: 20px 0 20px 0;">
+                <h1 style="color: #ffffff; font-size: 24px; margin: 0;  font-family: Microsoft YaHei;">GTE订单自动下载结果</h1>
+            </td>
+          </tr>
+          <tr>
+            <td bgcolor="#ffffff" style="padding: 30px 20px 30px 20px;">
+              <table border="0" cellpadding="0" cellspacing="0" width="100%" style="border-collapse: collapse;">
+                <tr>
+                  <td align="center" style="color: #000000; font-family: Microsoft YaHei;">
+                    <p style="margin: 0;">{body_text}</p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td bgcolor="#005691" style="padding: 10px 10px;">
+                <table border="0" cellpadding="0" cellspacing="0" width="100%" style="border-collapse: collapse;">
+                <tr>
+                  <td align="center" style="color: #00000; font-family: Microsoft YaHei; font-size: 14px;">
+                    <p style="color: #ffffff; margin: 0;">Powered by VHCN ICO</p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>"""
+
     def send_mail(self):
         mail_host = os.environ.get("MAIL_HOST", "smtp.163.com")
         mail_user = os.environ.get("MAIL_USER", "")
         mail_pass = os.environ.get("MAIL_PASS", "")
         sender = mail_user
-        # 邮件接受方邮箱地址，注意需要[]包裹，这意味着你可以写多个邮件地址群发
         receivers = self.rec
-        # 设置email信息
-        # 邮件内容设置
+
         email = MIMEMultipart()
-        # 邮件主题
         time = datetime.now().isoformat(" ", "seconds")
         email["Subject"] = f"no-reply: {time} GTE订单自动下载结果"
-        # 发送方信息
         email["From"] = formataddr(["Mail Bot@VHCN", sender])
-        # 接受方信息
         email["To"] = receivers
 
-        # add attachments
         file_list = [f for f in os.listdir(self.folder) if f.endswith(".zip")]
         for file in file_list:
             with open(f"{self.folder}\\{file}", "rb") as f:
                 part = MIMEApplication(f.read())
             part.add_header("Content-Disposition", "attachment", filename=file)
             email.attach(part)
-        # dynamic email content
+
         if not file_list and self.once == "1":
             message = f"单次执行无订单不发送邮件!"
             self.sinOut.emit(message)
             return
         elif not file_list:
-            email_content = """\
-<html>
-<head>
-  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
-  <title>GTE订单自动下载结果</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-</head>
-
-<body style="margin: 0; padding: 0;">
-  <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
-    <tr>
-      <td style="padding: 20px 0 30px 0;">
-
-        <table align="center" border="0" cellpadding="0" cellspacing="0" width="600" style="border-collapse: collapse; border: 1px solid #cccccc;">
-          <tr>
-            <td align="center" bgcolor="#005691" style="padding: 20px 0 20px 0;">
-                <h1 style="color: #ffffff; font-size: 24px; margin: 0;  font-family: Microsoft YaHei;">GTE订单自动下载结果</h1>
-            </td>
-          </tr>  
-          <tr>
-            <td bgcolor="#ffffff" style="padding: 30px 20px 30px 20px;">
-              <table border="0" cellpadding="0" cellspacing="0" width="100%" style="border-collapse: collapse;">
-                <tr>
-                  <td align="center" style="color: #000000; font-family: Microsoft YaHei;">
-                    <p style="margin: 0;">没有新的订单, 请知悉! </p>
-                  </td>
-                </tr>
-              </table>
-            </td>
-          </tr>
-          <tr>
-            <td bgcolor="#005691" style="padding: 10px 10px;">
-                <table border="0" cellpadding="0" cellspacing="0" width="100%" style="border-collapse: collapse;">
-                <tr>
-                  <td align="center" style="color: #00000; font-family: Microsoft YaHei; font-size: 14px;">
-                    <p style="color: #ffffff; margin: 0;">Powered by VHCN ICO</p>
-                  </td>
-                  <td align="right">
-                    <table border="0" cellpadding="0" cellspacing="0" style="border-collapse: collapse;">
-                    </table>
-                  </td>
-                </tr>
-              </table>
-            </td>
-          </tr>
-        </table>
-
-      </td>
-    </tr>
-  </table>
-</body>
-</html>
-"""
+            email_content = self._email_html("没有新的订单, 请知悉!")
         else:
-            pass
-            email_content = """ \
-<html>
-<head>
-  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
-  <title>GTE订单自动下载结果</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-</head>
+            email_content = self._email_html("附件为新的订单, 请查收!")
 
-<body style="margin: 0; padding: 0;">
-  <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
-    <tr>
-      <td style="padding: 20px 0 30px 0;">
-
-        <table align="center" border="0" cellpadding="0" cellspacing="0" width="600" style="border-collapse: collapse; border: 1px solid #cccccc;">
-          <tr>
-            <td align="center" bgcolor="#005691" style="padding: 20px 0 20px 0;">
-                <h1 style="color: #ffffff; font-size: 24px; margin: 0;  font-family: Microsoft YaHei;">GTE订单自动下载结果</h1>
-            </td>
-          </tr>  
-          <tr>
-            <td bgcolor="#ffffff" style="padding: 30px 20px 30px 20px;">
-              <table border="0" cellpadding="0" cellspacing="0" width="100%" style="border-collapse: collapse;">
-                <tr>
-                  <td align="center" style="color: #000000; font-family: Microsoft YaHei;">
-                    <p style="margin: 0;">附件为新的订单, 请查收! </p>
-                  </td>
-                </tr>
-              </table>
-            </td>
-          </tr>
-          <tr>
-            <td bgcolor="#005691" style="padding: 10px 10px;">
-                <table border="0" cellpadding="0" cellspacing="0" width="100%" style="border-collapse: collapse;">
-                <tr>
-                  <td align="center" style="color: #00000; font-family: Microsoft YaHei; font-size: 14px;">
-                    <p style="color: #ffffff; margin: 0;">Powered by VHCN ICO</p>
-                  </td>
-                  <td align="right">
-                    <table border="0" cellpadding="0" cellspacing="0" style="border-collapse: collapse;">
-                    </table>
-                  </td>
-                </tr>
-              </table>
-            </td>
-          </tr>
-        </table>
-
-      </td>
-    </tr>
-  </table>
-</body>
-</html>
-"""
-        # insert content
         email.attach(MIMEText(email_content, "html", "utf-8"))
 
         try:
@@ -403,7 +332,6 @@ class Worker(QThread):
         now_hm = now.strftime("%H:%M")
         now_d = now.strftime("%Y-%m-%d")
         now_dhm = now.strftime("%Y-%m-%d %H:%M")
-        # sch_hm =input('输入时间(格式09:00): ')
         if now.weekday() == 4:
             delta = 3
         elif now.weekday() == 5:
@@ -411,50 +339,21 @@ class Worker(QThread):
         else:
             delta = 1
         sch_hm = self.timer
-        if self.chk_workday == "5":
-            if now_hm < sch_hm:
-                self.sch_dhm = f"{now_d} {sch_hm}"
-                gap = str(
-                    datetime.strptime(self.sch_dhm, "%Y-%m-%d %H:%M")
-                    - datetime.strptime(now_dhm, "%Y-%m-%d %H:%M")
-                )
-                self.gap_h = gap.split(":")[0]
-                self.gap_m = gap.split(":")[1]
-            else:
-                sch_d = datetime.strftime((now + timedelta(days=delta)), "%Y-%m-%d")
-                self.sch_dhm = f"{sch_d} {sch_hm}"
-                gap = str(
-                    datetime.strptime(self.sch_dhm, "%Y-%m-%d %H:%M")
-                    - datetime.strptime(now_dhm, "%Y-%m-%d %H:%M")
-                )
-                if "day" in str(gap):
-                    self.gap_d = gap[0]
-                    self.gap_h = int(gap.split(":")[0][-2:]) + 24 * int(self.gap_d)
-                else:
-                    self.gap_h = int(gap.split(":")[0])
-                self.gap_m = gap.split(":")[1]
+        if now_hm < sch_hm:
+            self.sch_dhm = f"{now_d} {sch_hm}"
         else:
-            if now_hm < sch_hm:
-                self.sch_dhm = f"{now_d} {sch_hm}"
-                gap = str(
-                    datetime.strptime(self.sch_dhm, "%Y-%m-%d %H:%M")
-                    - datetime.strptime(now_dhm, "%Y-%m-%d %H:%M")
-                )
-                self.gap_h = gap.split(":")[0]
-                self.gap_m = gap.split(":")[1]
-            else:
-                sch_d = datetime.strftime((now + timedelta(days=delta)), "%Y-%m-%d")
-                self.sch_dhm = f"{sch_d} {sch_hm}"
-                gap = str(
-                    datetime.strptime(self.sch_dhm, "%Y-%m-%d %H:%M")
-                    - datetime.strptime(now_dhm, "%Y-%m-%d %H:%M")
-                )
-                if "day" in str(gap):
-                    self.gap_d = gap[0]
-                    self.gap_h = int(gap.split(":")[0][-2:]) + 24 * int(self.gap_d)
-                else:
-                    self.gap_h = gap.split(":")[0]
-                self.gap_m = gap.split(":")[1]
+            sch_d = datetime.strftime((now + timedelta(days=delta)), "%Y-%m-%d")
+            self.sch_dhm = f"{sch_d} {sch_hm}"
+        gap = str(
+            datetime.strptime(self.sch_dhm, "%Y-%m-%d %H:%M")
+            - datetime.strptime(now_dhm, "%Y-%m-%d %H:%M")
+        )
+        if "day" in gap:
+            self.gap_d = gap[0]
+            self.gap_h = int(gap.split(":")[0][-2:]) + 24 * int(self.gap_d)
+        else:
+            self.gap_h = int(gap.split(":")[0])
+        self.gap_m = gap.split(":")[1]
 
     def run(self):
         # 主逻辑
